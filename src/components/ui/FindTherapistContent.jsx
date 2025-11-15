@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { MagnifyingGlassIcon, FunnelIcon, PhoneIcon, StarIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContext'; // 1. IMPORT useAuth
 
 // Mock data for dropdowns based on images
 const specialties = ['All Specialties', 'Anxiety', 'Depression', 'CBT', 'Trauma', 'Couples Therapy', 'Teen Therapy', 'ADHD'];
@@ -68,6 +69,7 @@ const FindTherapistContent = () => {
     const [therapistList, setTherapistList] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { getAuthHeader } = useAuth();
 
     // Function to fetch data from the backend API
     const fetchTherapists = useCallback(async () => {
@@ -86,7 +88,9 @@ const FindTherapistContent = () => {
         const apiUrl = `/api/therapists${queryString ? '?' + queryString : ''}`;
 
         try {
-            const response = await fetch(apiUrl);
+            const response = await fetch(apiUrl, {
+                headers: getAuthHeader()
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -99,7 +103,7 @@ const FindTherapistContent = () => {
         } finally {
             setLoading(false);
         }
-    }, [specialty, location]); // Dependencies: Refetch when these filters change
+    }, [specialty, location, getAuthHeader]); // Dependencies: Refetch when these filters change
 
     // useEffect to trigger the fetch function when filters change
     useEffect(() => {

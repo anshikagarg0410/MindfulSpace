@@ -1,39 +1,89 @@
-import React, { useState } from 'react';
-import ChatMessage from './ChatMessage'; // New component
-import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
+import React, { useState, useEffect, useRef } from 'react';
+import ChatMessage from './ChatMessage';
+import { PaperAirplaneIcon, SparklesIcon } from '@heroicons/react/24/outline'; // Import SparklesIcon
+import { useAuth } from '../../context/AuthContext';
 
+// Start with just the initial bot greeting
 const initialMessages = [
-    { type: 'bot', text: "Hello! I'm here to listen and support you. How are you feeling today?", time: '18:44' },
-    { type: 'user', text: "hi", time: '18:45' },
-    { type: 'bot', text: "I'm here to listen and support you. Can you tell me more about what you're experiencing?", time: '18:45' },
+    { type: 'bot', text: "Hello! I'm here to listen and support you. How are you feeling today?", time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) },
 ];
 
 const AIChatWindow = () => {
     const [messages, setMessages] = useState(initialMessages);
     const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false); // For loading state
+    const chatEndRef = useRef(null); // To auto-scroll
+    const { getAuthHeader } = useAuth();
 
-    const handleSend = (e) => {
+    // Auto-scroll to bottom when new messages are added
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    const handleSend = async (e) => {
         e.preventDefault();
-        if (input.trim() !== '') {
-            // Simulate sending a message
-            const newMessage = { 
-                type: 'user', 
-                text: input.trim(), 
-                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) 
+        const trimmedInput = input.trim();
+        if (trimmedInput === '') return;
+
+        const newTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        
+        // 1. Create new user message
+        const newUserMessage = { 
+            type: 'user', 
+            text: trimmedInput, 
+            time: newTime
+        };
+
+        // 2. Update UI immediately and set typing state
+        setMessages(prev => [...prev, newUserMessage]);
+        setInput('');
+        setIsTyping(true);
+
+        try {
+            // 3. Send history AND new message to the backend
+            const response = await fetch('/api/ai-chat', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...getAuthHeader()
+                    // Note: Auth token is handled by the proxy, but if you secure
+                    // this endpoint, you'd add getAuthHeader() here.
+                },
+                body: JSON.stringify({
+                    // Send the history *before* this new message
+                    history: messages, 
+                    message: trimmedInput 
+                })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.reply || 'Network response was not ok');
+            }
+
+            const data = await response.json();
+
+            // 4. Create new bot reply
+            const botReply = {
+                type: 'bot',
+                text: data.reply || "Sorry, I couldn't get a response.",
+                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
             };
-            setMessages([...messages, newMessage]);
-            setInput('');
-            
-            // In a real app, this is where you'd send the message to the AI backend
-            // For now, let's simulate an auto-reply after a short delay
-            setTimeout(() => {
-                const botReply = {
-                    type: 'bot',
-                    text: "Thank you for sharing that. It sounds like you're dealing with a lot. Remember to be kind to yourself.",
-                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
-                };
-                setMessages(prev => [...prev, botReply]);
-            }, 1500);
+
+            // 5. Add bot reply to state
+            setMessages(prev => [...prev, botReply]);
+
+        } catch (error) {
+            console.error("Full Gemini API Error:", error); // <-- ADD THIS LINE
+            console.error("Error fetching AI reply:", error);
+            const errorReply = {
+                type: 'bot',
+                text: error.message || "I'm having a little trouble connecting. Please try again.",
+                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+            };
+            setMessages(prev => [...prev, errorReply]);
+        } finally {
+            setIsTyping(false);
         }
     };
 
@@ -50,6 +100,21 @@ const AIChatWindow = () => {
                         time={msg.time} 
                     />
                 ))}
+                
+                {/* Typing Indicator */}
+                {isTyping && (
+                    <div className="flex w-full my-4 justify-start">
+                        <div className="flex-shrink-0 mr-3 self-end">
+                            <span className='text-violet-600 p-2 rounded-full bg-violet-100'><SparklesIcon className='w-5 h-5'/></span>
+                        </div>
+                        <div className="p-3 shadow-md bg-violet-100 text-gray-500 rounded-r-xl rounded-bl-xl">
+                            <p className='text-sm italic'>MindfulBot is typing...</p>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Empty div to scroll to */}
+                <div ref={chatEndRef} />
             </div>
 
             {/* Chat Input Area */}
@@ -59,14 +124,15 @@ const AIChatWindow = () => {
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Share what's on your mind..."
+                        placeholder={isTyping ? "Waiting for response..." : "Share what's on your mind..."}
                         className="flex-1 px-4 py-3 border border-gray-300 rounded-full focus:ring-violet-500 focus:border-violet-500 text-gray-700"
+                        disabled={isTyping} // Disable input while typing
                     />
                     <button
                         type="submit"
-                        disabled={input.trim() === ''}
+                        disabled={input.trim() === '' || isTyping} // Disable button
                         className={`ml-3 p-3 rounded-full transition-colors ${
-                            input.trim() === '' 
+                            (input.trim() === '' || isTyping)
                             ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                             : 'bg-violet-600 text-white hover:bg-violet-700'
                         }`}
@@ -82,4 +148,4 @@ const AIChatWindow = () => {
     );
 };
 
-export default AIChatWindow; 
+export default AIChatWindow;

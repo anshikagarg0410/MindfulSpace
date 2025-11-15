@@ -1,10 +1,11 @@
 // khushisgh01/internshipproject/InternshipProject-8a5f69cd629fc2efec8342b72121374131129261/backend/server.js
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import apiRoutes from './routes/api.js'; 
 import authRoutes from './routes/auth.js'; // 💡 NEW IMPORT
 import connectDB from './config/db.js'; 
-import 'dotenv/config'; 
+ 
 
 const app = express();
 const PORT = 3001;

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { PlusIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'; 
+import { useAuth } from '../../context/AuthContext'; // 1. IMPORT useAuth
 
 // Internal component simulating a community post
 const PostCard = ({ initials, name, tag, time, text, hashtags, likes, comments, postTagColor }) => {
@@ -48,6 +49,7 @@ const CommunityFeedPlaceholder = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);
     const [selectedFilter, setSelectedFilter] = useState('All');
+    const { getAuthHeader } = useAuth();
 
     // Filter tags derived from the mock data, used for the filter buttons
     const TagFilter = ({ tag }) => (
@@ -68,7 +70,9 @@ const CommunityFeedPlaceholder = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/community');
+            const response = await fetch('/api/community', {
+                headers: getAuthHeader()
+            });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -81,7 +85,7 @@ const CommunityFeedPlaceholder = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [getAuthHeader]);
 
     useEffect(() => {
         fetchCommunityData();
@@ -103,7 +107,7 @@ const CommunityFeedPlaceholder = () => {
             try {
                 const response = await fetch('/api/community/post', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json' ,...getAuthHeader()},
                     body: JSON.stringify({ 
                         text: newPostText.trim(), 
                         tags,

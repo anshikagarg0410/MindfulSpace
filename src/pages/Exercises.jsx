@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from '../components/ui/Sidebar.jsx'; 
 import ExerciseCard from '../components/ui/ExerciseCard.jsx'; 
-
+import { useAuth } from '../context/AuthContext.jsx'; // 1. IMPORT useAuth
 // We define the categories here, as they are part of the UI/filtering logic
 const categories = ['All', 'Breathing', 'Mindfulness', 'Gratitude', 'CBT', 'Movement'];
 
@@ -24,13 +24,16 @@ const Exercises = () => {
   const [exerciseData, setExerciseData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { getAuthHeader } = useAuth();
 
   // Function to fetch data from the backend API
   const fetchExercises = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-        const response = await fetch('/api/exercises'); 
+        const response = await fetch('/api/exercises', {
+            headers: getAuthHeader() 
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -43,7 +46,7 @@ const Exercises = () => {
     } finally {
         setLoading(false);
     }
-  }, []);
+  }, [getAuthHeader]);
 
   useEffect(() => {
     fetchExercises();
